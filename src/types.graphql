@@ -1,19 +1,29 @@
+scalar Object
+
 type Query {
-  noop: Boolean
+  gameHistory(gameId: String!): Response!
 }
 
 type Mutation {
-  ping: Ping
+  createGame(multiplayer: Boolean!, emoji: String = "X"): Response!
+  joinToGame(gameId: String!, emoji: String = "O"): Response!
+  makeMove(token: String!, slotTarget: Int!): Response!
 }
 
 type Subscription {
-  pong: Pong
+  watch: Response
 }
 
-type Ping {
-  id: ID
+type Response {
+  feedbackMessage: String!
+  token: String
+  error: Boolean!
+  gameId: String
+  snap: [String]
+  history: [Object]
 }
 
-type Pong {
-  pingId: ID
+type GameMove {
+  slotTarget: Int!
+  emoji: String!
 }

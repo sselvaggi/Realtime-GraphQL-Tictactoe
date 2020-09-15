@@ -1,8 +1,8 @@
 import { GraphQLModule } from '@nestjs/graphql';
 import { Module } from '@nestjs/common';
 import { RedisPubSub } from 'graphql-redis-subscriptions';
-import { PingPongResolvers } from './ping-pong.resolvers';
-import * as Redis from 'ioredis';
+import { GameResolvers } from './app.resolvers';
+import * as RedisMock from 'redis-mock';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { join } from 'path';
@@ -21,7 +21,7 @@ import { join } from 'path';
   controllers: [AppController],
   providers: [
     AppService,
-    PingPongResolvers,
+    GameResolvers,
     {
       provide: 'PUB_SUB',
       useFactory: () => {
@@ -31,8 +31,8 @@ import { join } from 'path';
         };
 
         return new RedisPubSub({
-          publisher: new Redis(options),
-          subscriber: new Redis(options),
+          publisher: RedisMock.createClient(),
+          subscriber: RedisMock.createClient(),
         });
       },
     },
