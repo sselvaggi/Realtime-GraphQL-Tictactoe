@@ -17,6 +17,7 @@ class Response {
     public gameId: string = '',
     public snap: string[] = [],
     public history: HistoryStep[] = [],
+    public winner: string | null = null,
   ) {}
 }
 
@@ -34,8 +35,9 @@ export class GameResolvers {
       game.player1 = new GamePlayer(token, emoji);
       games.push(game);
       response.gameId = gameId;
-      response.snap = game.playground.toString().split(`\n`);
+      response.snap = game.toString().split(`\n`);
       response.token = token;
+      response.winner = game.winner;
       const multiplayerMessage = game.multiplayer
         ? 'share it with your partner to join'
         : '';
@@ -62,7 +64,8 @@ export class GameResolvers {
       game.player2 = new GamePlayer(token, emoji);
 
       response.token = token;
-      response.snap = game.playground.toString().split(`\n`);
+      response.snap = game.toString().split(`\n`);
+      response.winner = game.winner;
       response.feedbackMessage = `Welcome ${emoji} to game ${gameId}`;
       this.pubSub.publish(LIVE_EVENT_NAME, { [LIVE_EVENT_NAME]: response });
     } catch (error) {
@@ -82,18 +85,13 @@ export class GameResolvers {
       const { gameId, emoji } = parseToken(token);
       const game = games.find(x => x.id === gameId);
       if (!game) throw new errors.GameNotFound(gameId);
-      if (game.winner) throw new errors.CantMoveOnFinishedGame(game);
-      response.snap = game.playground.toString().split(`\n`);
+      response.snap = game.toString().split(`\n`);
       game.makeMove(token, slotTarget, emoji);
-      response.snap = game.playground.toString().split(`\n`);
+      response.winner = game.winner;
+      if (!game.multiplayer) game.moveAI();
+      response.snap = game.toString().split(`\n`);
+      response.winner = game.winner;
       this.pubSub.publish(LIVE_EVENT_NAME, { [LIVE_EVENT_NAME]: response });
-      if (!game.multiplayer)
-        setTimeout(() => {
-          game.moveAI();
-          const r = new Response(`${game.player2.emoji} moved`, false);
-          r.snap = game.playground.toString().split(`\n`);
-          this.pubSub.publish(LIVE_EVENT_NAME, { [LIVE_EVENT_NAME]: r });
-        }, 1000);
     } catch (error) {
       Logger.error(error.stack);
       response.error = true;
@@ -111,6 +109,7 @@ export class GameResolvers {
       const game = games.find(x => x.id === gameId);
       if (!game) throw new errors.GameNotFound(gameId);
       response.history = game.history;
+      response.winner = game.winner;
       response.feedbackMessage = `The winner is ${game.winner}`;
     } catch (error) {
       response.error = true;

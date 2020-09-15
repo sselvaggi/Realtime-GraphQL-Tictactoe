@@ -21,6 +21,7 @@ type Response {
   gameId: String
   snap: [String]
   history: [Object]
+  winner: String
 }
 
 type GameMove {

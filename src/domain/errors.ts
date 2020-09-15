@@ -1,4 +1,4 @@
-import { Playground } from './game';
+import { Game } from './game';
 
 export class MissingLoginToken extends Error {
   constructor() {
@@ -80,7 +80,7 @@ export class AttemptToMoveOutOfTurn extends Error {
 export class InvalidSlotTargetValue extends Error {
   constructor(value) {
     super(
-      `Invalid slot target ${value}. Only ${Playground.humanFriendlySlotTargets.join(
+      `Invalid slot target ${value}. Only ${Game.humanFriendlySlotTargets.join(
         ', ',
       )} are acceptable`,
     );

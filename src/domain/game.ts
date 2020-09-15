@@ -11,36 +11,64 @@ export class Game {
   readonly id: UUID;
   private _player1: GamePlayer = null;
   private _player2: GamePlayer = null;
-  readonly winner: GamePlayer | null;
+  private _winner: EMOJI | null;
   private _moves: GameMove[] = [];
-  readonly playground = new Playground();
+  private playground = [null, null, null, null, null, null, null, null, null];
+  static humanFriendlySlotTargets = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   constructor(readonly multiplayer: boolean) {
     this.id = uuidv4();
     if (!multiplayer) {
-      this.player2 = new GamePlayer(AI_TOKEN, AI_EMOJI);
+      this._player2 = new GamePlayer(AI_TOKEN, AI_EMOJI);
     }
   }
 
-  makeMove(token: PLAYER_TOKEN, slotTarget: number, emoji: EMOJI) {
+  makeMove(token: PLAYER_TOKEN, slotTarget: number, emoji: EMOJI): Game {
+    if (this.winner) throw new errors.CantMoveOnFinishedGame(this);
+
     if (this._player1.token !== token && this._player2.token !== token) {
       throw new errors.PlayerNotAllowToPlayInThisGame(this.id);
     }
-    if (this.lastMove && this.lastMove.emoji === emoji)
-      throw new errors.AttemptToMoveOutOfTurn();
 
-    const move = this.playground.makeMove(slotTarget, emoji);
-    this._moves = [...this._moves, move];
+    if (this.lastMove && this.lastMove.emoji === emoji) {
+      throw new errors.AttemptToMoveOutOfTurn();
+    }
+
+    if (Game.humanFriendlySlotTargets.indexOf(slotTarget) === -1) {
+      throw new errors.InvalidSlotTargetValue(slotTarget);
+    }
+
+    if (this.readSlot(slotTarget)) {
+      throw new errors.InvalidMoveTarget(slotTarget);
+    } else {
+      this.playground[slotTarget - 1] = emoji;
+    }
+
+    const winner = this.checkWinner();
+    if (winner !== null) this._winner = winner;
+
+    this._moves = [
+      ...this._moves,
+      {
+        slotTarget,
+        emoji,
+        snap: this.toString(),
+      },
+    ];
     return this;
   }
 
   moveAI() {
-    const freeSlots = this.playground.freeSlots;
-    return this.makeMove(AI_TOKEN, _.sample(freeSlots), AI_EMOJI);
+    const freeSlots = this.freeSlots;
+    return this.makeMove(
+      AI_TOKEN,
+      freeSlots[Math.floor(Math.random() * freeSlots.length)],
+      AI_EMOJI,
+    );
   }
 
   get lastMove(): GameMove {
-    return this._moves[this._moves.length];
+    return this._moves[this._moves.length - 1];
   }
 
   get history(): HistoryStep[] {
@@ -63,22 +91,65 @@ export class Game {
   }
 
   set player2(player: GamePlayer) {
+    if (!this.multiplayer) throw new errors.CantJoinToSinglePlayerGame(this);
     this._setPlayer(player, 2);
   }
 
   private _setPlayer(player, number: 1 | 2) {
     if (this.winner) throw new errors.CantJoinToFinishedGame(this);
-    if (!this.multiplayer) throw new errors.CantJoinToSinglePlayerGame(this);
     const theOtherPlayer = number === 1 ? this._player2 : this._player1;
     if (theOtherPlayer && theOtherPlayer.emoji === player.emoji)
       throw new errors.CantChooseTheSameEmojiAsOtherPlayer(player.emoji);
     this[`_player${number}`] = player;
   }
 
+  public get winner() {
+    return this._winner;
+  }
+
   static validateEmoji(emoji: EMOJI) {
     if (emoji.length === 1) return true;
-    if (EMOJI_REGEX.test(emoji) && emoji.length === 2) return true;
+    if (emoji.match(EMOJI_REGEX) && emoji.length === 2) return true;
     throw new errors.InvalidEmoji(emoji);
+  }
+
+  readSlot(slotTarget) {
+    return this.playground[slotTarget - 1];
+  }
+
+  checkWinner() {
+    const a = this.playground;
+    if (a[0] && a[0] === a[1] && a[1] === a[2]) return a[2];
+    if (a[3] && a[3] === a[4] && a[4] === a[5]) return a[5];
+    if (a[6] && a[6] === a[7] && a[7] === a[8]) return a[8];
+    if (a[0] && a[0] === a[3] && a[3] === a[6]) return a[6];
+    if (a[1] && a[1] === a[4] && a[4] === a[7]) return a[7];
+    if (a[2] && a[2] === a[5] && a[5] === a[8]) return a[8];
+    if (a[0] && a[0] === a[4] && a[4] === a[8]) return a[8];
+    if (a[2] && a[2] === a[4] && a[4] === a[6]) return a[6];
+    return null;
+  }
+  toString() {
+    return this.playground
+      .map((value, index) => {
+        const humanFriendlyIndex = index + 1;
+        const glue = humanFriendlyIndex % 3 === 0 ? `\n` : '|';
+        const char =
+          this.playground[index] === null
+            ? humanFriendlyIndex
+            : this.playground[index];
+        return ` ${char} ${glue}`;
+      })
+      .join('');
+  }
+  get freeSlots() {
+    const result = [];
+    for (let i = 0; i < this.playground.length; i++) {
+      if (this.playground[i] === null) {
+        result.push(i + 1);
+      }
+    }
+    return result;
   }
 }
 
@@ -91,48 +162,6 @@ export interface GameMove {
 export interface HistoryStep {
   emoji: string;
   slotTarget: number;
-}
-
-export class Playground {
-  private _a = [null, null, null, null, null, null, null, null, null];
-  static humanFriendlySlotTargets = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-  constructor() {}
-  readSlot(slotTarget) {
-    return this._a[slotTarget - 1];
-  }
-  makeMove(slotTarget, emoji): GameMove {
-    if (Playground.humanFriendlySlotTargets.indexOf(slotTarget) === -1)
-      throw new errors.InvalidSlotTargetValue(slotTarget);
-    if (this.readSlot(slotTarget))
-      throw new errors.InvalidMoveTarget(slotTarget);
-    else this._a[slotTarget - 1] = emoji;
-
-    return {
-      slotTarget,
-      emoji,
-      snap: this.toString(),
-    };
-  }
-  toString() {
-    return this._a
-      .map((value, index) => {
-        const humanFriendlyIndex = index + 1;
-        const glue = humanFriendlyIndex % 3 === 0 ? `\n` : '|';
-        const char =
-          this._a[index] === null ? humanFriendlyIndex : this._a[index];
-        return ` ${char} ${glue}`;
-      })
-      .join('');
-  }
-  get freeSlots() {
-    return this._a
-      .map((x, index) => {
-        return x === null ? index : null;
-      })
-      .filter(x => {
-        x !== null;
-      });
-  }
 }
 
 export class GamePlayer {

@@ -2,7 +2,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { Module } from '@nestjs/common';
 import { RedisPubSub } from 'graphql-redis-subscriptions';
 import { GameResolvers } from './app.resolvers';
-import * as RedisMock from 'redis-mock';
+import * as Redis from 'ioredis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { join } from 'path';
@@ -31,8 +31,8 @@ import { join } from 'path';
         };
 
         return new RedisPubSub({
-          publisher: RedisMock.createClient(),
-          subscriber: RedisMock.createClient(),
+          publisher: new Redis(options),
+          subscriber: new Redis(options),
         });
       },
     },
